@@ -32,10 +32,11 @@ export default function Home() {
       }
 
       const data = await res.json();
-      setEnglishSummary(data.englishSummary || "");
-      setUrduSummary(data.urduSummary || "");
-    } catch (err: any) {
-      console.error("Error:", err.message);
+      setEnglishSummary(data.englishSummary);
+      setUrduSummary(data.urduSummary);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Error:", error.message);
       setError("❌ Failed to summarise blog. Please check the URL.");
     } finally {
       setLoading(false);
@@ -58,14 +59,12 @@ export default function Home() {
       </Button>
 
       {error && (
-        <p className="text-red-500 mt-4 text-sm">
-          {error}
-        </p>
+        <p className="text-red-500 mt-4 text-sm">{error}</p>
       )}
 
       {englishSummary && (
         <div className="mt-6 p-4 border rounded bg-gray-100">
-          <h2 className="font-semibold mb-2">📌 English Summary:</h2>
+          <h2 className="font-semibold mb-2">🗒️ English Summary:</h2>
           <p>{englishSummary}</p>
         </div>
       )}

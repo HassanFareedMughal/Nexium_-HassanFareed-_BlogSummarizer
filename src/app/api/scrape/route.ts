@@ -28,7 +28,7 @@ function simulateSummary(text: string): string {
 // 🔁 LibreTranslate Urdu translation
 async function translateToUrdu(text: string): Promise<string> {
   try {
-    const response = await fetch("http://localhost:5000/translate", {
+    const response = await fetch("https://libretranslate.de/translate", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -47,10 +47,10 @@ async function translateToUrdu(text: string): Promise<string> {
     }
 
     const data = await response.json();
-    console.log("📥 LibreTranslate response:", data);
     return data.translatedText || "Translation failed.";
-  } catch (error) {
-    console.error("❌ LibreTranslate error:", error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("❌ LibreTranslate error:", err.message);
     return "Translation failed.";
   }
 }
@@ -92,8 +92,9 @@ export async function POST(req: NextRequest) {
 
     // Respond
     return NextResponse.json({ englishSummary, urduSummary });
-  } catch (error: any) {
-    console.error("🔥 API Error:", error.message);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("🔥 API Error:", err.message);
     return NextResponse.json(
       { error: "Server failed to summarise blog." },
       { status: 500 }
