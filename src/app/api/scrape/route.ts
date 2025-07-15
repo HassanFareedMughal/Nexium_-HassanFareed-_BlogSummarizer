@@ -1,55 +1,97 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import * as cheerio from "cheerio";
-import dictionary from "../../../lib/dictionary";
+import { MongoClient } from "mongodb";
+import { createClient } from "@supabase/supabase-js";
 
+console.log("✅ MONGODB_URI:", process.env.MONGODB_URI);
+console.log("✅ SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log("✅ SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// MongoDB Setup
+const MONGODB_URI = process.env.MONGODB_URI!;
+const client = new MongoClient(MONGODB_URI);
+const db = client.db("blogdata");
+const collection = db.collection("blogs");
+
+// Supabase Setup
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Simulated Summary (first 3 sentences)
 function simulateSummary(text: string): string {
   return text.split(".").slice(0, 3).join(".") + ".";
 }
 
-function translateToUrdu(summary: string): string {
-  return summary
-    .split(" ")
-    .map((word) => dictionary[word.toLowerCase()] || word)
-    .join(" ");
-}
-
-export async function POST(req: NextRequest) {
+// 🔁 LibreTranslate Urdu translation
+async function translateToUrdu(text: string): Promise<string> {
   try {
-    const { url } = await req.json();
-    console.log("🟡 Received URL:", url);
+    const response = await fetch("http://localhost:5000/translate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        q: text,
+        source: "en",
+        target: "ur",
+        format: "text",
+      }),
+    });
 
-    const response = await axios.get(url, {
-  headers: {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/113 Safari/537.36",
-    Accept: "text/html",
-  },
-});
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Invalid response from translation API");
+    }
 
-    console.log("✅ Blog fetched");
-
-    const $ = cheerio.load(response.data);
-    // Try targeting actual article content first
-let text = $("article").text();
-
-if (!text || text.length < 100) {
-  // fallback: body text but without script/style
-  $("script, style, noscript").remove();
-  text = $("body").text();
+    const data = await response.json();
+    console.log("📥 LibreTranslate response:", data);
+    return data.translatedText || "Translation failed.";
+  } catch (error) {
+    console.error("❌ LibreTranslate error:", error);
+    return "Translation failed.";
+  }
 }
 
-text = text.replace(/\s+/g, " ").trim();
+// 🟨 POST Handler
+export async function POST(req: NextRequest) {
+  const { url } = await req.json();
 
-    console.log("🟢 Extracted text length:", text.length);
+  try {
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
 
-    const summary = simulateSummary(text);
-    console.log("✂️ Summary:", summary);
+    const text = $("article, .post-content, .blog-post, .main-content")
+      .first()
+      .text()
+      .replace(/\s+/g, " ")
+      .trim();
 
-    const urduSummary = translateToUrdu(summary);
-    console.log("🌐 Urdu Summary:", urduSummary);
+    console.log("🔎 Scraped Content Sample:", text.slice(0, 500));
 
-    return NextResponse.json({ urduSummary });
+    if (!text || text.length < 100) {
+      return NextResponse.json(
+        { error: "Failed to extract blog content." },
+        { status: 500 }
+      );
+    }
+
+    // English Summary
+    const englishSummary = simulateSummary(text);
+
+    // Urdu Translation
+    const urduSummary = await translateToUrdu(englishSummary);
+
+    // Save to MongoDB
+    await collection.insertOne({ url, fullText: text });
+
+    // Save to Supabase
+    await supabase.from("summaries").insert([{ url, urduSummary }]);
+
+    // Respond
+    return NextResponse.json({ englishSummary, urduSummary });
   } catch (error: any) {
     console.error("🔥 API Error:", error.message);
     return NextResponse.json(

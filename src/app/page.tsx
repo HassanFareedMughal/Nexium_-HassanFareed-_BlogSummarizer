@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [url, setUrl] = useState("");
-  const [summary, setSummary] = useState("");
+  const [englishSummary, setEnglishSummary] = useState("");
+  const [urduSummary, setUrduSummary] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
     setLoading(true);
-    setSummary("");
+    setEnglishSummary("");
+    setUrduSummary("");
     setError("");
 
     try {
@@ -30,7 +32,8 @@ export default function Home() {
       }
 
       const data = await res.json();
-      setSummary(data.urduSummary);
+      setEnglishSummary(data.englishSummary || "");
+      setUrduSummary(data.urduSummary || "");
     } catch (err: any) {
       console.error("Error:", err.message);
       setError("❌ Failed to summarise blog. Please check the URL.");
@@ -60,10 +63,17 @@ export default function Home() {
         </p>
       )}
 
-      {summary && (
+      {englishSummary && (
         <div className="mt-6 p-4 border rounded bg-gray-100">
+          <h2 className="font-semibold mb-2">📌 English Summary:</h2>
+          <p>{englishSummary}</p>
+        </div>
+      )}
+
+      {urduSummary && (
+        <div className="mt-4 p-4 border rounded bg-gray-100">
           <h2 className="font-semibold mb-2">📌 Urdu Summary:</h2>
-          <p>{summary}</p>
+          <p>{urduSummary}</p>
         </div>
       )}
     </main>
